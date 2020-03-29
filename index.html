@@ -2,13 +2,13 @@
 <head>
 	<style>
 		body {
-			background-color: #243540;
+			background-color: #421A24;
 			color: #FFF;
 			font-family: "Arial";
 		}
 
 		div {
-			background-color: #587E8C;
+			background-color: #8F4A4A;
 			border-radius: 20px;
 			margin: 0 auto;
 			max-width: 800px;
@@ -16,7 +16,7 @@
 		}
 
 		h3 {
-			background-color: #45626E;
+			background-color: #702D32;
 			text-align: center;
 			padding: 5px;
 			border-radius: 20px;
@@ -35,7 +35,7 @@
 		}
 
 		input {
-			background-color: #45626E;
+			background-color: #702D32;
 			border-radius: 20px;
 			border: none;
 			color: #FFF;
@@ -78,10 +78,12 @@
 			<tr>
 				<td class='tool'><label for='msg'>Message</label></td>
 				<td class='tool'><input id='msg' type='text' value='0123456789ABCDEFFEDCBA9876543210' oninput='computeAES()'/></td>
+				<!--td class='tool'><input id='msg' type='text' value='0123456789ABCDEFFEDCBA9876543210' oninput='computeAES()'/></td-->
 			</tr>
 			<tr>
 				<td class='tool'><label for='key'>Key</label></td>
 				<td class='tool'><input id='key' type='text' value='0F1571C947D9E8591CB7ADD6AF7F6798' oninput='computeAES()'/></td>
+				<!--td class='tool'><input id='key' type='text' value='0F1571C947D9E8591CB7ADD6AF7F6798' oninput='computeAES()'/></td-->
 			</tr>
 			<tr>
 				<td colspan='2' style='border-radius: 20px; overflow: hidden'>
@@ -165,7 +167,7 @@
 			return str;
 		}
 
-		function encrypt(msg, key_str, numSteps) {
+		function encrypt(msg, keyStr, numSteps) {
 			const Sbox = [
 				99, 124, 119, 123, 242, 107, 111, 197, 48, 1, 103, 43, 254, 215, 171,
 				118, 202, 130, 201, 125, 250, 89, 71, 240, 173, 212, 162, 175, 156, 164, 114, 192, 183, 253,
@@ -185,38 +187,74 @@
 
 			const byteToString = (byte) => ('00' + byte.toString(16)).slice(-2).toUpperCase();
 
-			const subBytes = (block, sbox) => {
-				for (let i = 0; i < 16; i++)
+			const subBytes = (block, sbox, count) => {
+				/* Step */
+				if(step++ == numSteps) return html;
+				html += '<br><h3><span class="step">Step ' + step + ', Round ' + count + ':</span> Substitute bytes</h3>';
+
+				html += 'Each cell is plugged into the following S-box (first=row, second=column):<br><br>';
+				html += '<table border="1" cellpadding="5" style="background-color: #FFF">';
+				html += '<tr><td></td>';
+				for(let i = 0; i < 16; i++) {
+					html += '<td style="background-color: #FEE6EA">X<b>' + i.toString(16).toUpperCase() + '</b></td>'
+				}
+				html += '</tr>'
+				for(let i = 0; i < 16; i++) {
+					html += '<tr><td style="background-color: #FEE6EA"><b>' + i.toString(16).toUpperCase() + '</b>X</td>';
+					for(let j = 0; j < 16; j++) {
+						html += '<td>' + byteToString(sbox[i * 16 + j]) + '</td>';
+					}
+					html += '</tr>';
+				}
+				html += '</table>';
+
+				for(let i = 0; i < 16; i++)
 					block[i] = sbox[block[i]];
-				html += 'Substitute bytes:'
+
+				html += 'Note that this is equivalent to making the S-box a one-dimensional list, converting the cell into base-10 and making it an index into the S-box list.<br>'
+				html += '<br>The resulting state of the block is as follows:<br><br>'
 				logBlock(block);
 			}
 
-			const addRoundKey = (block, rkey, w) => {
-				html += 'The round key is added by XORing the block with the expanded keys, ' + `w${w}, w${w + 1}, w${w + 2}, and w${w + 3}` + ':<br><br>';
+			const addRoundKey = (block, rkey, w, count) => {
+				/* Step */
+				if(step++ == numSteps) return html;
+				html += '<br><h3><span class="step">Step ' + step + ', Round ' + count + ':</span> Add round key</h3>';
+
+				html += 'The round key is added by XORing the block with the expanded keys, ' + `w${w}, w${w + 1}, w${w + 2}, and w${w + 3}` + ', as displayed in the following table:<br><br>';
 
 				html += '<table border="1" cellpadding="5" style="background-color: #FFF">';
-				html += '<tr><td>Previous block</td><td>' + block.map(x => byteToString(x)).join('</td><td>') + '</td></tr>';
-				html += '<tr><td rowspan="2">Round key</td><td colspan="4">w' + (w) + '</td><td colspan="4">w' + (w + 1) + '</td><td colspan="4">w' + (w + 2) + '</td><td colspan="4">w' + (w + 3) + '</td></tr>';
+				html += '<tr><th style="background-color: #FEE6EA">Previous block</th><td>' + block.map(x => byteToString(x)).join('</td><td>')
+				 + '</td></tr>';
+				html += '<tr><th rowspan="2" style="background-color: #FEE6EA">Round key</th><td colspan="4">w' + w + '</td><td colspan="4">w' + (w + 1) + '</td><td colspan="4">w' + (w + 2) + '</td><td colspan="4">w' + (w + 3) + '</td></tr>';
 				html += '<tr><td>' + rkey.map(x => byteToString(x)).join('</td><td>') + '</td></tr>';
 
-				for (let i = 0; i < 16; i++)
+				for (let i = 0; i < 16; i++) {
 					block[i] ^= rkey[i];
+				}
 
-				html += '<tr><td>Result</td><td>' + block.map(x => byteToString(x)).join('</td><td>') + '</td></tr>';
-				html += '</table><br>Block state:<br><br>'
+				html += '<tr><th style="background-color: #FEE6EA">Result (⊕)</th><td>' + block.map(x => byteToString(x)).join('</td><td>') + '</td></tr>';
+				html += '</table><br>Block state:<br><br>';
 				logBlock(block);
 			}
 
-			const shiftRows = (block, shifttab) => {
+			const shiftRows = (block, shiftTab, count) => {
+				/* Step */
+				if(step++ == numSteps) return html;
+				html += '<br><h3><span class="step">Step ' + step + ', Round ' + count + ':</span> Shift rows</h3>';
+
 				let h = new Array().concat(block);
-				for (let i = 0; i < 16; i++)
-					block[i] = h[shifttab[i]];
+				for (let i = 0; i < 16; i++) {
+					block[i] = h[shiftTab[i]];
+				}
 				html += 'Shift rows:'
 				logBlock(block);
 			}
 
-			const mixColumns = (block) => {
+			const mixColumns = (block, count) => {
+				/* Step */
+				if(step++ == numSteps) return html;
+				html += '<br><h3><span class="step">Step ' + step + ', Round ' + count + ':</span> Mix columns</h3>';
 				for (let i = 0; i < 16; i += 4) { //Iterate through first row
 					let s0 = block[i + 0]; //Get the elements of the current column
 					let s1 = block[i + 1];
@@ -236,6 +274,9 @@
 			}
 
 			const invMixColumns = (block) => {
+				/* Step */
+				if(step++ == numSteps) return html;
+				html += '<br><h3><span class="step">Step ' + step + ':</span> Inverse mix columns</h3>';
 				for (let i = 0; i < 16; i += 4) {
 					let s0 = block[i + 0],
 						s1 = block[i + 1];
@@ -263,7 +304,6 @@
 			const logBlock = (block) => {
 				html += '<table border="1" cellpadding="5" style="background-color: #FFF">';
 				for (let i = 0; i < block.length; i += 4) {
-					//if (i % 16 == 0) s += '\n';
 					let s1 = '00' + block[i].toString(16).toUpperCase();
 					s1 = s1.substring(s1.length - 2);
 					let s2 = '00' + block[i + 1].toString(16).toUpperCase();
@@ -276,8 +316,6 @@
 				}
 				html += '</table>';
 			}
-
-			const pre = ['w0 =  = ', 'w1 =  = ', 'w2 =  = ', 'w3 =  = ', 'w4 = w0 ⊕ z1 = ', 'w5 = w4 ⊕ w1 = ', 'w6 = w5 ⊕ w2 = ', 'w7 = w6 ⊕ w3 = ', 'w8 = w4 ⊕ z2 = ', 'w9 = w8 ⊕ w5 = ', 'w10 = w9 ⊕ w6 = ', 'w11 = w10 ⊕ w7 = ', 'w12 = w8 ⊕ z3 = ', 'w13 = w12 ⊕ w9 = ', 'w14 = w13 ⊕ w10 = ', 'w15 = w14 ⊕ w11 = ', 'w16 = w12⊕ z4 = ', 'w17 = w16⊕ w13 = ', 'w18 = w17⊕ w14 = ', 'w19 = w18⊕ w15 = ', 'w20 = w16⊕ z5 = ', 'w21 = w20⊕ w17 = ', 'w22 = w21⊕ w18 = ', 'w23 = w22⊕ w19 = ', 'w24 = w20⊕ z6 = ', 'w25 = w24⊕ w21 = ', 'w26 = w25⊕ w22 = ', 'w27 = w26⊕ w23 = ', 'w28 = w24⊕ z7 = ', 'w29 = w28⊕ w25 = ', 'w30 = w29⊕ w26 = ', 'w31 = w30⊕ w27 = ', 'w32 = w28⊕ z8 = ', 'w33 = w32⊕ w29 = ', 'w34 = w33⊕ w30 = ', 'w35 = w34⊕ w32 =', 'w36 = w32⊕ z9 = ', 'w37 = w36⊕ w33 = ', 'w38 = w37⊕ w34 = ', 'w39 = w38⊕ w35 = ', 'w40 = w36⊕ z10 = ', 'w41 = w40⊕ w37 = ', 'w42 = w41⊕ w38 = ', 'w43 = w42⊕ w39 = '];
 
 			invSbox = new Array(256);
 			for (let i = 0; i < 256; i++) {
@@ -299,12 +337,13 @@
 			let step = 0;
 			let html = '<h3><span class="step">Step 0:</span> Initialization</h3>';
 
+			// Parse strings into an array of integers
 			let block = msg.match(/(..?)/g).map(x => parseInt(x, 16));
-			key = key_str.match(/(..?)/g).map(x => parseInt(x, 16));
+			let key = keyStr.match(/(..?)/g).map(x => parseInt(x, 16));
 
 			html += 'Message: ' + msg.match(/(..?)/g).join(', ') + '<br><br>';
 			logBlock(block);
-			html += '<br><hr><br>Key: ' + key_str.match(/(..?)/g).join(', ') + '<br><br>';
+			html += '<br><hr><br>Key: ' + keyStr.match(/(..?)/g).join(', ') + '<br><br>';
 			logBlock(key);
 
 
@@ -314,8 +353,8 @@
 
 			// Depending on the desired encryption strength of 128, 192 or 256 bits 'key' has to be a byte array of length 16, 24 or 32, respectively. The key expansion is done 'in place', meaning that the array 'key' is modified.
 			const expandKey = (key) => {
-				let keySize, Rcon = 1;
-				switch (key.length) {
+				let keyLength = key.length, keySize, Rcon = 1;
+				switch (keyLength) {
 					case 16:
 						keySize = 16 * (10 + 1);
 						break;
@@ -326,88 +365,81 @@
 						keySize = 16 * (14 + 1);
 						break;
 					default:
-						alert('Only key lengths of 16, 24 or 32 bytes allowed!');
+						alert('Key length can only by 16, 24 or 32 bytes.');
 				}
-				for (let i = key.length; i < keySize; i += 4) {
+				
+
+				html += '<table border="1" cellpadding="5" style="background-color: #FFF; width:100%">';
+
+				html += '<tr style="background-color: #FFC7C9">'
+				html += '<th>z1</th><th>z2</th><th>z3</th><th>z4</th><th>z5</th><th>z6</th><th>z7</th><th>z8</th><th>z9</th><th>z10</th>';
+				html += '</tr><tr>';
+				for (let i = keyLength; i < keySize; i += 4) {
 					let temp = key.slice(i - 4, i);
-					if (i % key.length == 0) {
-						temp = new Array(Sbox[temp[1]] ^ Rcon, Sbox[temp[2]],
-							Sbox[temp[3]], Sbox[temp[0]]);
-						if ((Rcon <<= 1) >= 256)
+					if (i % keyLength == 0) {
+						temp = [
+							Sbox[temp[1]] ^ Rcon,
+							Sbox[temp[2]],
+							Sbox[temp[3]],
+							Sbox[temp[0]]
+						];
+						if ((Rcon <<= 1) >= 256) {
 							Rcon ^= 0x11b;
-					} else if ((key.length > 24) && (i % key.length == 16))
-						temp = new Array(Sbox[temp[0]], Sbox[temp[1]],
-							Sbox[temp[2]], Sbox[temp[3]]);
-					for (let j = 0; j < 4; j++)
-						key[i + j] = key[i + j - key.length] ^ temp[j];
+						}
+						html += '<td>' + temp.map(x => byteToString(x)).join(' ') + '</td>';
+					} else if ((keyLength > 24) && (i % keyLength == 16)) {
+						temp = [
+							Sbox[temp[0]],
+							Sbox[temp[1]],
+							Sbox[temp[2]],
+							Sbox[temp[3]]
+						];
+					}
+					for (let j = 0; j < 4; j++) {
+						//console.log(i+j)
+						key[i + j] = key[i + j - keyLength] ^ temp[j];
+					}
 				}
+				html += '</tr>';
+				html += '</table>';
+				html += '<br>';
+
+				const pre = ['w0 =  = ', 'w1 =  = ', 'w2 =  = ', 'w3 =  = ', 'w4 = w0  ⊕ z1 = ', 'w5 = w4  ⊕ w1 = ', 'w6 = w5  ⊕ w2 = ', 'w7 = w6  ⊕ w3 = ', 'w8 = w4  ⊕ z2 = ', 'w9 = w8  ⊕ w5 = ', 'w10 = w9  ⊕ w6 = ', 'w11 = w10  ⊕ w7 = ', 'w12 = w8  ⊕ z3 = ', 'w13 = w12  ⊕ w9 = ', 'w14 = w13  ⊕ w10 = ', 'w15 = w14  ⊕ w11 = ', 'w16 = w12 ⊕ z4 = ', 'w17 = w16 ⊕ w13 = ', 'w18 = w17 ⊕ w14 = ', 'w19 = w18 ⊕ w15 = ', 'w20 = w16 ⊕ z5 = ', 'w21 = w20 ⊕ w17 = ', 'w22 = w21 ⊕ w18 = ', 'w23 = w22 ⊕ w19 = ', 'w24 = w20 ⊕ z6 = ', 'w25 = w24 ⊕ w21 = ', 'w26 = w25 ⊕ w22 = ', 'w27 = w26 ⊕ w23 = ', 'w28 = w24 ⊕ z7 = ', 'w29 = w28 ⊕ w25 = ', 'w30 = w29 ⊕ w26 = ', 'w31 = w30 ⊕ w27 = ', 'w32 = w28 ⊕ z8 = ', 'w33 = w32 ⊕ w29 = ', 'w34 = w33 ⊕ w30 = ', 'w35 = w34 ⊕ w32 =', 'w36 = w32 ⊕ z9 = ', 'w37 = w36 ⊕ w33 = ', 'w38 = w37 ⊕ w34 = ', 'w39 = w38 ⊕ w35 = ', 'w40 = w36 ⊕ z10 = ', 'w41 = w40 ⊕ w37 = ', 'w42 = w41 ⊕ w38 = ', 'w43 = w42 ⊕ w39 = '];
+
+				html += '<table border="1" cellpadding="5" style="background-color: #FFF; width:100%">';
+				html += '<tr style="background-color: #FFC7C9"><th>Round key</th><th>Expansion formula</th><th>Final output</th></tr>'
+				for (let i = 0; i < key.length; i += 4) {
+					let s1 = '00' + key[i].toString(16).toUpperCase();
+					s1 = s1.substring(s1.length - 2);
+					let s2 = '00' + key[i + 1].toString(16).toUpperCase();
+					s2 = s2.substring(s2.length - 2);
+					let s3 = '00' + key[i + 2].toString(16).toUpperCase();
+					s3 = s3.substring(s3.length - 2);
+					let s4 = '00' + key[i + 3].toString(16).toUpperCase();
+					s4 = s4.substring(s4.length - 2);
+
+					let s = (pre[i / 4] + ' ' + s1 + ' ' + s2 + ' ' + s3 + ' ' + s4).split(' = ');
+
+
+					html += '<tr' + (Math.floor(i / 16) % 2 == 1 ? ' style="background-color: #FEE6EA"' : '') + '><td>' + s[0] + '</td><td>' + s[1] + '</td><td><b>' + s[2] + '</b></td></tr>';
+				}
+				html += '</table>'
 			}
 			expandKey(key);
 
-			html += '<table border="1" cellpadding="5" style="background-color: #FFF; width:100%">';
-			html += '<tr style="background-color: #CCC"><th>Round key</th><th>Expansion formula</th><th>Final output</th></tr>'
-			for (let i = 0; i < key.length; i += 4) {
-				let s1 = '00' + key[i].toString(16).toUpperCase();
-				s1 = s1.substring(s1.length - 2);
-				let s2 = '00' + key[i + 1].toString(16).toUpperCase();
-				s2 = s2.substring(s2.length - 2);
-				let s3 = '00' + key[i + 2].toString(16).toUpperCase();
-				s3 = s3.substring(s3.length - 2);
-				let s4 = '00' + key[i + 3].toString(16).toUpperCase();
-				s4 = s4.substring(s4.length - 2);
-
-				let s = (pre[i / 4] + ' ' + s1 + ' ' + s2 + ' ' + s3 + ' ' + s4).split(' = ');
-
-
-				html += '<tr' + (Math.floor(i / 16) % 2 == 0 ? ' style="background-color: #E9E9E9"' : '') + '><td>' + s[0] + '</td><td>' + s[1] + '</td><td><b>' + s[2] + '</b></td></tr>';
-			}
-			html += '</table>'
-
-
-			/* Step 2 */
-			if(step++ == numSteps) return html;
-			html += '<br><h3><span class="step">Step 2:</span> Add round key</h3>';
-
 			let count = 0, i;
-			addRoundKey(block, key.slice(0, 16), w = 0);
+			addRoundKey(block, key.slice(0, 16), 0, count);
 			for (i = 16; i < key.length - 16; i += 16) {
 				count++;
 
-				/* Step */
-				if(step++ == numSteps) return html;
-				html += '<br><h3><span class="step">Step ' + step + ', Round ' + count + ':</span> Substitute bytes</h3>';
-				subBytes(block, Sbox);
-				
-				/* Step */
-				if(step++ == numSteps) return html;
-				html += '<br><h3><span class="step">Step ' + step + ', Round ' + count + ':</span> Shift rows</h3>';
-				shiftRows(block, shiftRowTab);
-				
-				/* Step */
-				if(step++ == numSteps) return html;
-				html += '<br><h3><span class="step">Step ' + step + ', Round ' + count + ':</span> Mix columns</h3>';
-				mixColumns(block);
-				
-				/* Step */
-				if(step++ == numSteps) return html;
-				html += '<br><h3><span class="step">Step ' + step + ', Round ' + count + ':</span> Add round key</h3>';
-				addRoundKey(block, key.slice(i, i + 16), w = i / 4);
+				subBytes(block, Sbox, count);
+				shiftRows(block, shiftRowTab, count);
+				mixColumns(block, count);
+				addRoundKey(block, key.slice(i, i + 16), i / 4, count);
 			}
-				
-			/* Step */
-			if(step++ == numSteps) return html;
-			html += '<br><h3><span class="step">Step ' + step + ', Round ' + count + ':</span> Substitute bytes</h3>';
-			subBytes(block, Sbox);
-				
-			/* Step */
-			if(step++ == numSteps) return html;
-			html += '<br><h3><span class="step">Step ' + step + ', Round ' + count + ':</span> Shift rows</h3>';
-			shiftRows(block, shiftRowTab);
-				
-			/* Step */
-			if(step++ == numSteps) return html;
-			html += '<br><h3><span class="step">Step ' + step + ', Round ' + count + ':</span> Add round key</h3>';
-			addRoundKey(block, key.slice(i, key.length), w = i / 4);
+			subBytes(block, Sbox, count);
+			shiftRows(block, shiftRowTab, count);
+			addRoundKey(block, key.slice(i, key.length), i / 4, count);
 
 
 			/* Step 42 */
