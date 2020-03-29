@@ -1,0 +1,427 @@
+<html>
+<head>
+	<style>
+		body {
+			background-color: #243540;
+			color: #FFF;
+			font-family: "Arial";
+		}
+
+		div {
+			background-color: #587E8C;
+			border-radius: 20px;
+			margin: 0 auto;
+			max-width: 800px;
+			padding: 20px;
+		}
+
+		h3 {
+			background-color: #45626E;
+			text-align: center;
+			padding: 5px;
+			border-radius: 20px;
+			color: #FFF;
+		}
+
+		.step {
+			margin-left: 10px;
+			float: left;
+		}
+
+		.tool {
+			max-width: 30px;
+			padding-right: 30px;
+			text-align: right;
+		}
+
+		input {
+			background-color: #45626E;
+			border-radius: 20px;
+			border: none;
+			color: #FFF;
+			font-family: "Verdana";
+			padding: 3px;
+			text-align: center;
+			width: 100%;
+		}
+
+		#output {
+			background-color: #FAF2EC;
+			border-radius: 0;
+			color: #000;
+			font-family: "Verdana";
+			font-size: 0.7em;
+			height: 600px;
+			overflow-y: scroll;
+			resize: vertical;
+			text-align: left;
+		}
+
+		table {
+			background-color: inherit;
+			border-collapse: collapse;
+			border-color: #EEE;
+			color: inherit;
+			font-size: inherit;
+			text-align: center;
+		}
+
+		tr {
+			width: 100%;
+		}
+	</style>
+</head>
+<body>
+	<div>
+		<h2 align='center'><span class='tool' style='color:#75A8BA;float:left;font-size:16px'>CS4920/5920</span>AES Calculator</h2>
+		<table style='width: 100%'>
+			<tr>
+				<td class='tool'><label for='msg'>Message</label></td>
+				<td class='tool'><input id='msg' type='text' value='0123456789ABCDEFFEDCBA9876543210' oninput='computeAES()'/></td>
+			</tr>
+			<tr>
+				<td class='tool'><label for='key'>Key</label></td>
+				<td class='tool'><input id='key' type='text' value='0F1571C947D9E8591CB7ADD6AF7F6798' oninput='computeAES()'/></td>
+			</tr>
+			<tr>
+				<td colspan='2' style='border-radius: 20px; overflow: hidden'>
+					<br>
+					<div id='output'></div>
+					<br>
+				</td>
+			</tr>
+			<tr>
+				<td class='tool'><label for='ciphertext'>Ciphertext</label></td>
+				<td><input id='ciphertext' type='text' value='' readonly/></td>
+			</tr>
+		<table>
+	</div>
+	<script>
+		function getCaretPosition(ctrl) {
+			var CaretPos = 0; // IE Support
+			if(document.selection) {
+				ctrl.focus();
+				var Sel = document.selection.createRange();
+				Sel.moveStart('character', -ctrl.value.length);
+				CaretPos = Sel.text.length;
+			} else if(ctrl.selectionStart || ctrl.selectionStart == '0') {
+				CaretPos = ctrl.selectionStart; // Firefox support
+			}
+			return CaretPos;
+		}
+
+		function setCaretPosition(ctrl, pos) {
+			if(ctrl.setSelectionRange) {
+				ctrl.focus();
+				ctrl.setSelectionRange(pos, pos);
+			} else if(ctrl.createTextRange) {
+				var range = ctrl.createTextRange();
+				range.collapse(true);
+				range.moveEnd('character', pos);
+				range.moveStart('character', pos);
+				range.select();
+			}
+		}
+
+
+
+		computeAES();
+
+		function computeAES() {
+			const msgDOM = document.getElementById('msg');
+			const keyDOM = document.getElementById('key');
+
+			let caretPos = getCaretPosition(document.activeElement);
+
+			msgDOM.value = (msgDOM.value.toUpperCase().replace(/[^0-9A-F]/, '') + '00000000000000000000000000000000').substring(0, 32); // 64 bits long
+			keyDOM.value = (keyDOM.value.toUpperCase().replace(/[^0-9A-F]/, '') + '00000000000000000000000000000000').substring(0, 32); // 64 bits long
+
+			setCaretPosition(document.activeElement, caretPos);
+
+			const msg = msgDOM.value;
+			const key = keyDOM.value;
+			let encryption = encrypt(msg, key, 2000000);
+
+			const output = document.getElementById('output');
+			output.innerHTML = encryption;
+		}
+
+		// Add spaces to a sequence of numbers
+		function formatBinary(str) {
+			switch (str.length) {
+				case 16:
+				case 32:
+				case 64:
+					return str.match(/.{4}/g).join(' ');
+					break;
+				case 28:
+				case 56:
+					return str.match(/.{7}/g).join(' ');
+					break;
+				case 48:
+					return str.match(/.{6}/g).join(' ');
+					break;
+			}
+			return str;
+		}
+
+		function encrypt(msg, key_str, numSteps) {
+			const Sbox = [
+				99, 124, 119, 123, 242, 107, 111, 197, 48, 1, 103, 43, 254, 215, 171,
+				118, 202, 130, 201, 125, 250, 89, 71, 240, 173, 212, 162, 175, 156, 164, 114, 192, 183, 253,
+				147, 38, 54, 63, 247, 204, 52, 165, 229, 241, 113, 216, 49, 21, 4, 199, 35, 195, 24, 150, 5, 154,
+				7, 18, 128, 226, 235, 39, 178, 117, 9, 131, 44, 26, 27, 110, 90, 160, 82, 59, 214, 179, 41, 227,
+				47, 132, 83, 209, 0, 237, 32, 252, 177, 91, 106, 203, 190, 57, 74, 76, 88, 207, 208, 239, 170,
+				251, 67, 77, 51, 133, 69, 249, 2, 127, 80, 60, 159, 168, 81, 163, 64, 143, 146, 157, 56, 245,
+				188, 182, 218, 33, 16, 255, 243, 210, 205, 12, 19, 236, 95, 151, 68, 23, 196, 167, 126, 61,
+				100, 93, 25, 115, 96, 129, 79, 220, 34, 42, 144, 136, 70, 238, 184, 20, 222, 94, 11, 219, 224,
+				50, 58, 10, 73, 6, 36, 92, 194, 211, 172, 98, 145, 149, 228, 121, 231, 200, 55, 109, 141, 213,
+				78, 169, 108, 86, 244, 234, 101, 122, 174, 8, 186, 120, 37, 46, 28, 166, 180, 198, 232, 221,
+				116, 31, 75, 189, 139, 138, 112, 62, 181, 102, 72, 3, 246, 14, 97, 53, 87, 185, 134, 193, 29,
+				158, 225, 248, 152, 17, 105, 217, 142, 148, 155, 30, 135, 233, 206, 85, 40, 223, 140, 161,
+				137, 13, 191, 230, 66, 104, 65, 153, 45, 15, 176, 84, 187, 22
+			];
+			const shiftRowTab = [0, 5, 10, 15, 4, 9, 14, 3, 8, 13, 2, 7, 12, 1, 6, 11];
+
+			const byteToString = (byte) => ('00' + byte.toString(16)).slice(-2).toUpperCase();
+
+			const subBytes = (block, sbox) => {
+				for (let i = 0; i < 16; i++)
+					block[i] = sbox[block[i]];
+				html += 'Substitute bytes:'
+				logBlock(block);
+			}
+
+			const addRoundKey = (block, rkey, w) => {
+				html += 'The round key is added by XORing the block with the expanded keys, ' + `w${w}, w${w + 1}, w${w + 2}, and w${w + 3}` + ':<br><br>';
+
+				html += '<table border="1" cellpadding="5" style="background-color: #FFF">';
+				html += '<tr><td>Previous block</td><td>' + block.map(x => byteToString(x)).join('</td><td>') + '</td></tr>';
+				html += '<tr><td rowspan="2">Round key</td><td colspan="4">w' + (w) + '</td><td colspan="4">w' + (w + 1) + '</td><td colspan="4">w' + (w + 2) + '</td><td colspan="4">w' + (w + 3) + '</td></tr>';
+				html += '<tr><td>' + rkey.map(x => byteToString(x)).join('</td><td>') + '</td></tr>';
+
+				for (let i = 0; i < 16; i++)
+					block[i] ^= rkey[i];
+
+				html += '<tr><td>Result</td><td>' + block.map(x => byteToString(x)).join('</td><td>') + '</td></tr>';
+				html += '</table><br>Block state:<br><br>'
+				logBlock(block);
+			}
+
+			const shiftRows = (block, shifttab) => {
+				let h = new Array().concat(block);
+				for (let i = 0; i < 16; i++)
+					block[i] = h[shifttab[i]];
+				html += 'Shift rows:'
+				logBlock(block);
+			}
+
+			const mixColumns = (block) => {
+				for (let i = 0; i < 16; i += 4) { //Iterate through first row
+					let s0 = block[i + 0]; //Get the elements of the current column
+					let s1 = block[i + 1];
+					let s2 = block[i + 2];
+					let s3 = block[i + 3];
+					let xor = s0 ^ s1 ^ s2 ^ s3;
+					//using a lookup table for the Galois Field part is more efficient
+					//x*2 = xtime(x)
+					//x*3 = xtime(x) + x 
+					block[i + 0] ^= xor ^ xtime[s0 ^ s1]; //	x*2, x*3, x*1, x*1
+					block[i + 1] ^= xor ^ xtime[s1 ^ s2]; //	x*1, x*2, x*3, x*1
+					block[i + 2] ^= xor ^ xtime[s2 ^ s3]; //	x*1, x*1, x*2, x*3
+					block[i + 3] ^= xor ^ xtime[s3 ^ s0]; //	x*3, x*1, x*1, x*2
+				}
+				html += 'Mix columns:'
+				logBlock(block);
+			}
+
+			const invMixColumns = (block) => {
+				for (let i = 0; i < 16; i += 4) {
+					let s0 = block[i + 0],
+						s1 = block[i + 1];
+					let s2 = block[i + 2],
+						s3 = block[i + 3];
+					let h = s0 ^ s1 ^ s2 ^ s3;
+					let xh = xtime[h];
+					let h1 = xtime[xtime[xh ^ s0 ^ s2]] ^ h;
+					let h2 = xtime[xtime[xh ^ s1 ^ s3]] ^ h;
+					block[i + 0] ^= h1 ^ xtime[s0 ^ s1];
+					block[i + 1] ^= h2 ^ xtime[s1 ^ s2];
+					block[i + 2] ^= h1 ^ xtime[s2 ^ s3];
+					block[i + 3] ^= h2 ^ xtime[s3 ^ s0];
+				}
+				html += 'Unmix columns:'
+				logBlock(block);
+			}
+
+			const toHexString = (byteArray) => {
+				return Array.from(byteArray, function(byte) {
+					return ('0' + (byte & 0xFF).toString(16)).slice(-2);
+				}).join('').toUpperCase();
+			}
+
+			const logBlock = (block) => {
+				html += '<table border="1" cellpadding="5" style="background-color: #FFF">';
+				for (let i = 0; i < block.length; i += 4) {
+					//if (i % 16 == 0) s += '\n';
+					let s1 = '00' + block[i].toString(16).toUpperCase();
+					s1 = s1.substring(s1.length - 2);
+					let s2 = '00' + block[i + 1].toString(16).toUpperCase();
+					s2 = s2.substring(s2.length - 2);
+					let s3 = '00' + block[i + 2].toString(16).toUpperCase();
+					s3 = s3.substring(s3.length - 2);
+					let s4 = '00' + block[i + 3].toString(16).toUpperCase();
+					s4 = s4.substring(s4.length - 2);
+					html += `<tr><td>${s1}</td><td>${s2}</td><td>${s3}</td><td>${s4}</td></tr>`;
+				}
+				html += '</table>';
+			}
+
+			const pre = ['w0 =  = ', 'w1 =  = ', 'w2 =  = ', 'w3 =  = ', 'w4 = w0 ⊕ z1 = ', 'w5 = w4 ⊕ w1 = ', 'w6 = w5 ⊕ w2 = ', 'w7 = w6 ⊕ w3 = ', 'w8 = w4 ⊕ z2 = ', 'w9 = w8 ⊕ w5 = ', 'w10 = w9 ⊕ w6 = ', 'w11 = w10 ⊕ w7 = ', 'w12 = w8 ⊕ z3 = ', 'w13 = w12 ⊕ w9 = ', 'w14 = w13 ⊕ w10 = ', 'w15 = w14 ⊕ w11 = ', 'w16 = w12⊕ z4 = ', 'w17 = w16⊕ w13 = ', 'w18 = w17⊕ w14 = ', 'w19 = w18⊕ w15 = ', 'w20 = w16⊕ z5 = ', 'w21 = w20⊕ w17 = ', 'w22 = w21⊕ w18 = ', 'w23 = w22⊕ w19 = ', 'w24 = w20⊕ z6 = ', 'w25 = w24⊕ w21 = ', 'w26 = w25⊕ w22 = ', 'w27 = w26⊕ w23 = ', 'w28 = w24⊕ z7 = ', 'w29 = w28⊕ w25 = ', 'w30 = w29⊕ w26 = ', 'w31 = w30⊕ w27 = ', 'w32 = w28⊕ z8 = ', 'w33 = w32⊕ w29 = ', 'w34 = w33⊕ w30 = ', 'w35 = w34⊕ w32 =', 'w36 = w32⊕ z9 = ', 'w37 = w36⊕ w33 = ', 'w38 = w37⊕ w34 = ', 'w39 = w38⊕ w35 = ', 'w40 = w36⊕ z10 = ', 'w41 = w40⊕ w37 = ', 'w42 = w41⊕ w38 = ', 'w43 = w42⊕ w39 = '];
+
+			invSbox = new Array(256);
+			for (let i = 0; i < 256; i++) {
+				invSbox[Sbox[i]] = i;
+			}
+
+			invShiftRowTab = new Array(16);
+			for (let i = 0; i < 16; i++) {
+				invShiftRowTab[shiftRowTab[i]] = i;
+			}
+
+			xtime = new Array(256);
+			for (let i = 0; i < 128; i++) {
+				xtime[i] = i << 1;
+				xtime[128 + i] = (i << 1) ^ 0x1b;
+			}
+
+			/* Step 0 */
+			let step = 0;
+			let html = '<h3><span class="step">Step 0:</span> Initialization</h3>';
+
+			let block = msg.match(/(..?)/g).map(x => parseInt(x, 16));
+			key = key_str.match(/(..?)/g).map(x => parseInt(x, 16));
+
+			html += 'Message: ' + msg.match(/(..?)/g).join(', ') + '<br><br>';
+			logBlock(block);
+			html += '<br><hr><br>Key: ' + key_str.match(/(..?)/g).join(', ') + '<br><br>';
+			logBlock(key);
+
+
+			/* Step 1 */
+			if(step++ == numSteps) return html;
+			html += '<br><h3><span class="step">Step 1:</span> Expand the key</h3>';
+
+			// Depending on the desired encryption strength of 128, 192 or 256 bits 'key' has to be a byte array of length 16, 24 or 32, respectively. The key expansion is done 'in place', meaning that the array 'key' is modified.
+			const expandKey = (key) => {
+				let keySize, Rcon = 1;
+				switch (key.length) {
+					case 16:
+						keySize = 16 * (10 + 1);
+						break;
+					case 24:
+						keySize = 16 * (12 + 1);
+						break;
+					case 32:
+						keySize = 16 * (14 + 1);
+						break;
+					default:
+						alert('Only key lengths of 16, 24 or 32 bytes allowed!');
+				}
+				for (let i = key.length; i < keySize; i += 4) {
+					let temp = key.slice(i - 4, i);
+					if (i % key.length == 0) {
+						temp = new Array(Sbox[temp[1]] ^ Rcon, Sbox[temp[2]],
+							Sbox[temp[3]], Sbox[temp[0]]);
+						if ((Rcon <<= 1) >= 256)
+							Rcon ^= 0x11b;
+					} else if ((key.length > 24) && (i % key.length == 16))
+						temp = new Array(Sbox[temp[0]], Sbox[temp[1]],
+							Sbox[temp[2]], Sbox[temp[3]]);
+					for (let j = 0; j < 4; j++)
+						key[i + j] = key[i + j - key.length] ^ temp[j];
+				}
+			}
+			expandKey(key);
+
+			html += '<table border="1" cellpadding="5" style="background-color: #FFF; width:100%">';
+			html += '<tr style="background-color: #CCC"><th>Round key</th><th>Expansion formula</th><th>Final output</th></tr>'
+			for (let i = 0; i < key.length; i += 4) {
+				let s1 = '00' + key[i].toString(16).toUpperCase();
+				s1 = s1.substring(s1.length - 2);
+				let s2 = '00' + key[i + 1].toString(16).toUpperCase();
+				s2 = s2.substring(s2.length - 2);
+				let s3 = '00' + key[i + 2].toString(16).toUpperCase();
+				s3 = s3.substring(s3.length - 2);
+				let s4 = '00' + key[i + 3].toString(16).toUpperCase();
+				s4 = s4.substring(s4.length - 2);
+
+				let s = (pre[i / 4] + ' ' + s1 + ' ' + s2 + ' ' + s3 + ' ' + s4).split(' = ');
+
+
+				html += '<tr' + (Math.floor(i / 16) % 2 == 0 ? ' style="background-color: #E9E9E9"' : '') + '><td>' + s[0] + '</td><td>' + s[1] + '</td><td><b>' + s[2] + '</b></td></tr>';
+			}
+			html += '</table>'
+
+
+			/* Step 2 */
+			if(step++ == numSteps) return html;
+			html += '<br><h3><span class="step">Step 2:</span> Add round key</h3>';
+
+			let count = 0, i;
+			addRoundKey(block, key.slice(0, 16), w = 0);
+			for (i = 16; i < key.length - 16; i += 16) {
+				count++;
+
+				/* Step */
+				if(step++ == numSteps) return html;
+				html += '<br><h3><span class="step">Step ' + step + ', Round ' + count + ':</span> Substitute bytes</h3>';
+				subBytes(block, Sbox);
+				
+				/* Step */
+				if(step++ == numSteps) return html;
+				html += '<br><h3><span class="step">Step ' + step + ', Round ' + count + ':</span> Shift rows</h3>';
+				shiftRows(block, shiftRowTab);
+				
+				/* Step */
+				if(step++ == numSteps) return html;
+				html += '<br><h3><span class="step">Step ' + step + ', Round ' + count + ':</span> Mix columns</h3>';
+				mixColumns(block);
+				
+				/* Step */
+				if(step++ == numSteps) return html;
+				html += '<br><h3><span class="step">Step ' + step + ', Round ' + count + ':</span> Add round key</h3>';
+				addRoundKey(block, key.slice(i, i + 16), w = i / 4);
+			}
+				
+			/* Step */
+			if(step++ == numSteps) return html;
+			html += '<br><h3><span class="step">Step ' + step + ', Round ' + count + ':</span> Substitute bytes</h3>';
+			subBytes(block, Sbox);
+				
+			/* Step */
+			if(step++ == numSteps) return html;
+			html += '<br><h3><span class="step">Step ' + step + ', Round ' + count + ':</span> Shift rows</h3>';
+			shiftRows(block, shiftRowTab);
+				
+			/* Step */
+			if(step++ == numSteps) return html;
+			html += '<br><h3><span class="step">Step ' + step + ', Round ' + count + ':</span> Add round key</h3>';
+			addRoundKey(block, key.slice(i, key.length), w = i / 4);
+
+
+			/* Step 42 */
+			if(step++ == numSteps) return html;
+			html += '<br><h3><span class="step">Step ' + step + ':</span> Output the ciphertext</h3>';
+
+			html += 'FINAL RESULT:\n'+toHexString(block);
+
+			ciphertext = toHexString(block);
+
+			const ciphertextDOM = document.getElementById('ciphertext');
+			ciphertextDOM.value = ciphertext;
+			return html;
+		}
+	</script>
+</body>
+</html>
