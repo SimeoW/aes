@@ -4,7 +4,7 @@ Advanced Encryption Standard (AES) has been adopted worldwide, and is based on t
 ![](/diagram.png)
 
 ## Usage
-Given a plaintext and a key, this application will compute the DES ciphertext, and log every step in the process.
+Given a plaintext and a key, this application will compute the AES ciphertext, and log every step in the process.
 Simply type a hexadecimal value into one of the input boxes, and the output will update automatically.
 
 ![](/screenshot.png)
