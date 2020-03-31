@@ -73,17 +73,19 @@
 </head>
 <body>
 	<div>
-		<h2 align='center'><span class='tool' style='color:#75A8BA;float:left;font-size:16px'>CS4920/5920</span>AES Calculator</h2>
+		<h2 align='center'><span class='tool' style='color:#FFC7C9;float:left;font-size:16px'>CS4920/5920</span>AES Calculator</h2>
 		<table style='width: 100%'>
 			<tr>
 				<td class='tool'><label for='msg'>Message</label></td>
 				<td class='tool'><input id='msg' type='text' value='0123456789ABCDEFFEDCBA9876543210' oninput='computeAES()'/></td>
-				<!--td class='tool'><input id='msg' type='text' value='0123456789ABCDEFFEDCBA9876543210' oninput='computeAES()'/></td-->
 			</tr>
 			<tr>
 				<td class='tool'><label for='key'>Key</label></td>
 				<td class='tool'><input id='key' type='text' value='0F1571C947D9E8591CB7ADD6AF7F6798' oninput='computeAES()'/></td>
-				<!--td class='tool'><input id='key' type='text' value='0F1571C947D9E8591CB7ADD6AF7F6798' oninput='computeAES()'/></td-->
+			</tr>
+			<tr>
+				<td class='tool'><input id='transpose' type='checkbox' onclick='computeAES()' style='width: inherit; float: right'/></td>
+				<td class='tool'><label for='transpose' style='float: left; margin-left: 13px'>Display blocks in their transpose form</label></td>
 			</tr>
 			<tr>
 				<td colspan='2' style='border-radius: 20px; overflow: hidden'>
@@ -99,7 +101,10 @@
 		<table>
 	</div>
 	<script>
+		let useBlockTranspose = document.getElementById('transpose').checked;
+		let updateAEStimer = null;
 		function getCaretPosition(ctrl) {
+			if(ctrl.type != 'text') return;
 			var CaretPos = 0; // IE Support
 			if(document.selection) {
 				ctrl.focus();
@@ -113,6 +118,7 @@
 		}
 
 		function setCaretPosition(ctrl, pos) {
+			if(ctrl.type != 'text') return;
 			if(ctrl.setSelectionRange) {
 				ctrl.focus();
 				ctrl.setSelectionRange(pos, pos);
@@ -132,6 +138,7 @@
 		function computeAES() {
 			const msgDOM = document.getElementById('msg');
 			const keyDOM = document.getElementById('key');
+			useBlockTranspose = document.getElementById('transpose').checked;
 
 			let caretPos = getCaretPosition(document.activeElement);
 
@@ -140,12 +147,14 @@
 
 			setCaretPosition(document.activeElement, caretPos);
 
-			const msg = msgDOM.value;
-			const key = keyDOM.value;
-			let encryption = encrypt(msg, key, 2000000);
-
-			const output = document.getElementById('output');
-			output.innerHTML = encryption;
+			clearTimeout(updateAEStimer);
+			updateAEStimer = setTimeout(function() {
+				const msg = msgDOM.value;
+				const key = keyDOM.value;
+				let encryption = encrypt(msg, key, 2000000);
+				const output = document.getElementById('output');
+				output.innerHTML = encryption;
+			}, 500);
 		}
 
 		// Add spaces to a sequence of numbers
@@ -213,7 +222,7 @@
 
 				html += 'Note that this is equivalent to making the S-box a one-dimensional list, converting the cell into base-10 and making it an index into the S-box list.<br>'
 				html += '<br>The resulting state of the block is as follows:<br><br>'
-				logBlock(block);
+				printBlock(block, useBlockTranspose);
 			}
 
 			const addRoundKey = (block, rkey, w, count) => {
@@ -229,13 +238,13 @@
 				html += '<tr><th rowspan="2" style="background-color: #FEE6EA">Round key</th><td colspan="4">w' + w + '</td><td colspan="4">w' + (w + 1) + '</td><td colspan="4">w' + (w + 2) + '</td><td colspan="4">w' + (w + 3) + '</td></tr>';
 				html += '<tr><td>' + rkey.map(x => byteToString(x)).join('</td><td>') + '</td></tr>';
 
-				for (let i = 0; i < 16; i++) {
+				for(let i = 0; i < 16; i++) {
 					block[i] ^= rkey[i];
 				}
 
 				html += '<tr><th style="background-color: #FEE6EA">Result (⊕)</th><td>' + block.map(x => byteToString(x)).join('</td><td>') + '</td></tr>';
 				html += '</table><br>Block state:<br><br>';
-				logBlock(block);
+				printBlock(block, useBlockTranspose);
 			}
 
 			const shiftRows = (block, shiftTab, count) => {
@@ -244,40 +253,73 @@
 				html += '<br><h3><span class="step">Step ' + step + ', Round ' + count + ':</span> Shift rows</h3>';
 
 				let h = new Array().concat(block);
-				for (let i = 0; i < 16; i++) {
+				for(let i = 0; i < 16; i++) {
 					block[i] = h[shiftTab[i]];
 				}
-				html += 'Shift rows:'
-				logBlock(block);
+				html += 'In this step, the rows are cyclically shifted by an offset. The first row is left unchanged, the second row is shifted one to the left (or three to the right), the third is offset two to the left (or two to the right), and the third is offset three to the left (or one to the right).<br><br>The resulting block state is as follows:<br><br>'
+				printBlock(block, useBlockTranspose);
 			}
 
 			const mixColumns = (block, count) => {
 				/* Step */
 				if(step++ == numSteps) return html;
 				html += '<br><h3><span class="step">Step ' + step + ', Round ' + count + ':</span> Mix columns</h3>';
-				for (let i = 0; i < 16; i += 4) { //Iterate through first row
-					let s0 = block[i + 0]; //Get the elements of the current column
+
+
+				html += 'In this step, each column is combined using an invertible linear transformation. This is done by taking:<br><br>';
+
+
+				html += '<table border="1" cellpadding="5" style="background-color: #FFF">';
+				html += '<tr>';
+				html += '<td>02</td><td>03</td><td>01</td><td>01</td>';
+				html += '<tr><td>01</td><td>02</td><td>03</td><td>01</td>';
+				html += '<tr><td>01</td><td>01</td><td>02</td><td>03</td>';
+				html += '<tr><td>03</td><td>01</td><td>01</td><td>02</td>';
+				html += '</table>';
+				html += '<br>And peforming a matrix multiply on the block:<br><br>';
+
+				printBlock(block, useBlockTranspose);
+
+				html += '<br>';
+
+				for(let i = 0; i < 16; i += 4) { // Iterate through first row
+					let s0 = block[i + 0]; // Get the elements of the current column
 					let s1 = block[i + 1];
 					let s2 = block[i + 2];
 					let s3 = block[i + 3];
 					let xor = s0 ^ s1 ^ s2 ^ s3;
-					//using a lookup table for the Galois Field part is more efficient
-					//x*2 = xtime(x)
-					//x*3 = xtime(x) + x 
-					block[i + 0] ^= xor ^ xtime[s0 ^ s1]; //	x*2, x*3, x*1, x*1
-					block[i + 1] ^= xor ^ xtime[s1 ^ s2]; //	x*1, x*2, x*3, x*1
-					block[i + 2] ^= xor ^ xtime[s2 ^ s3]; //	x*1, x*1, x*2, x*3
-					block[i + 3] ^= xor ^ xtime[s3 ^ s0]; //	x*3, x*1, x*1, x*2
+					// Use a lookup table for the Galois Field part
+					block[i + 0] ^= xor ^ xtime[s0 ^ s1]; // x*2, x*3, x*1, x*1
+					block[i + 1] ^= xor ^ xtime[s1 ^ s2]; // x*1, x*2, x*3, x*1
+					block[i + 2] ^= xor ^ xtime[s2 ^ s3]; // x*1, x*1, x*2, x*3
+					block[i + 3] ^= xor ^ xtime[s3 ^ s0]; // x*3, x*1, x*1, x*2
+					if((s0 ^ s1) < 128) xtimeStr = `(${byteToString(s0)} ⊕ ${byteToString(s1)}) * 2`;
+					else xtimeStr = `((${byteToString(s0)} ⊕ ${byteToString(s1)}) * 2 - 256) ⊕ 1B`;
+					html += `${byteToString(s0)} ⊕ (${byteToString(s0)} ⊕ ${byteToString(s1)} ⊕ ${byteToString(s2)} ⊕ ${byteToString(s3)}) ⊕ (${xtimeStr}) = <b>${byteToString(block[i + 0])}</b><br>`;
+
+					if((s1 ^ s2) < 128) xtimeStr = `(${byteToString(s1)} ⊕ ${byteToString(s2)}) * 2`;
+					else xtimeStr = `((${byteToString(s1)} ⊕ ${byteToString(s2)}) * 2 - 256) ⊕ 1B`;
+					html += `${byteToString(s1)} ⊕ (${byteToString(s0)} ⊕ ${byteToString(s1)} ⊕ ${byteToString(s2)} ⊕ ${byteToString(s3)}) ⊕ (${xtimeStr}) = <b>${byteToString(block[i + 1])}</b><br>`;
+
+					if((s2 ^ s3) < 128) xtimeStr = `(${byteToString(s2)} ⊕ ${byteToString(s3)}) * 2`;
+					else xtimeStr = `((${byteToString(s2)} ⊕ ${byteToString(s3)}) * 2 - 256) ⊕ 1B`;
+					html += `${byteToString(s2)} ⊕ (${byteToString(s0)} ⊕ ${byteToString(s1)} ⊕ ${byteToString(s2)} ⊕ ${byteToString(s3)}) ⊕ (${xtimeStr}) = <b>${byteToString(block[i + 2])}</b><br>`;
+
+					if((s3 ^ s0) < 128) xtimeStr = `(${byteToString(s3)} ⊕ ${byteToString(s0)}) * 2`;
+					else xtimeStr = `((${byteToString(s3)} ⊕ ${byteToString(s0)}) * 2 - 256) ⊕ 1B`;
+					html += `${byteToString(s3)} ⊕ (${byteToString(s0)} ⊕ ${byteToString(s1)} ⊕ ${byteToString(s2)} ⊕ ${byteToString(s3)}) ⊕ (${xtimeStr}) = <b>${byteToString(block[i + 3])}</b><br>`;
+					html += '<br>';
 				}
-				html += 'Mix columns:'
-				logBlock(block);
+				html += '<i>Note that for the Galois field computation, (A ⊕ B) * 2, is used when (A ⊕ B) < 128, otherwise ((A ⊕ B) * 2 - 256) ⊕ 1B is used. Other methods are available as well.</i><br><br>'
+				html += 'The resulting output is as follows:<br><br>';
+				printBlock(block, useBlockTranspose);
 			}
 
 			const invMixColumns = (block) => {
 				/* Step */
 				if(step++ == numSteps) return html;
 				html += '<br><h3><span class="step">Step ' + step + ':</span> Inverse mix columns</h3>';
-				for (let i = 0; i < 16; i += 4) {
+				for(let i = 0; i < 16; i += 4) {
 					let s0 = block[i + 0],
 						s1 = block[i + 1];
 					let s2 = block[i + 2],
@@ -292,7 +334,7 @@
 					block[i + 3] ^= h2 ^ xtime[s3 ^ s0];
 				}
 				html += 'Unmix columns:'
-				logBlock(block);
+				printBlock(block, useBlockTranspose);
 			}
 
 			const toHexString = (byteArray) => {
@@ -301,34 +343,40 @@
 				}).join('').toUpperCase();
 			}
 
-			const logBlock = (block) => {
+			const printBlock = (block, transpose = false) => {
 				html += '<table border="1" cellpadding="5" style="background-color: #FFF">';
-				for (let i = 0; i < block.length; i += 4) {
-					let s1 = '00' + block[i].toString(16).toUpperCase();
-					s1 = s1.substring(s1.length - 2);
-					let s2 = '00' + block[i + 1].toString(16).toUpperCase();
-					s2 = s2.substring(s2.length - 2);
-					let s3 = '00' + block[i + 2].toString(16).toUpperCase();
-					s3 = s3.substring(s3.length - 2);
-					let s4 = '00' + block[i + 3].toString(16).toUpperCase();
-					s4 = s4.substring(s4.length - 2);
-					html += `<tr><td>${s1}</td><td>${s2}</td><td>${s3}</td><td>${s4}</td></tr>`;
+				if(transpose) {
+					for(let i = 0; i < block.length; i += 4) {
+						let s1 = byteToString(block[i]);
+						let s2 = byteToString(block[i + 1]);
+						let s3 = byteToString(block[i + 2]);
+						let s4 = byteToString(block[i + 3]);
+						html += `<tr><td>${s1}</td><td>${s2}</td><td>${s3}</td><td>${s4}</td></tr>`;
+					}
+				} else {
+					for(let i = 0; i < 4; i++) {
+						html += '<tr>';
+						for(let j = 0; j < 4; j++) {
+							html += '<td>' + byteToString(block[j * 4 + i]); + '</td>'
+						}
+						html += '</tr>';
+					}
 				}
 				html += '</table>';
 			}
 
 			invSbox = new Array(256);
-			for (let i = 0; i < 256; i++) {
+			for(let i = 0; i < 256; i++) {
 				invSbox[Sbox[i]] = i;
 			}
 
 			invShiftRowTab = new Array(16);
-			for (let i = 0; i < 16; i++) {
+			for(let i = 0; i < 16; i++) {
 				invShiftRowTab[shiftRowTab[i]] = i;
 			}
 
 			xtime = new Array(256);
-			for (let i = 0; i < 128; i++) {
+			for(let i = 0; i < 128; i++) {
 				xtime[i] = i << 1;
 				xtime[128 + i] = (i << 1) ^ 0x1b;
 			}
@@ -342,9 +390,9 @@
 			let key = keyStr.match(/(..?)/g).map(x => parseInt(x, 16));
 
 			html += 'Message: ' + msg.match(/(..?)/g).join(', ') + '<br><br>';
-			logBlock(block);
+			printBlock(block, useBlockTranspose);
 			html += '<br><hr><br>Key: ' + keyStr.match(/(..?)/g).join(', ') + '<br><br>';
-			logBlock(key);
+			printBlock(key, useBlockTranspose);
 
 
 			/* Step 1 */
@@ -374,20 +422,21 @@
 				html += '<tr style="background-color: #FFC7C9">'
 				html += '<th>z1</th><th>z2</th><th>z3</th><th>z4</th><th>z5</th><th>z6</th><th>z7</th><th>z8</th><th>z9</th><th>z10</th>';
 				html += '</tr><tr>';
-				for (let i = keyLength; i < keySize; i += 4) {
+				for(let i = keyLength; i < keySize; i += 4) {
 					let temp = key.slice(i - 4, i);
-					if (i % keyLength == 0) {
+					if(i % keyLength == 0) {
 						temp = [
 							Sbox[temp[1]] ^ Rcon,
 							Sbox[temp[2]],
 							Sbox[temp[3]],
 							Sbox[temp[0]]
 						];
-						if ((Rcon <<= 1) >= 256) {
+						if((Rcon <<= 1) >= 256) {
 							Rcon ^= 0x11b;
 						}
-						html += '<td>' + temp.map(x => byteToString(x)).join(' ') + '</td>';
-					} else if ((keyLength > 24) && (i % keyLength == 16)) {
+						let z = temp.map(x => byteToString(x))
+						html += `<td>${z[0]} ${z[1]}<br>${z[2]} ${z[3]}</td>`;
+					} else if((keyLength > 24) && (i % keyLength == 16)) {
 						temp = [
 							Sbox[temp[0]],
 							Sbox[temp[1]],
@@ -395,8 +444,7 @@
 							Sbox[temp[3]]
 						];
 					}
-					for (let j = 0; j < 4; j++) {
-						//console.log(i+j)
+					for(let j = 0; j < 4; j++) {
 						key[i + j] = key[i + j - keyLength] ^ temp[j];
 					}
 				}
@@ -408,7 +456,7 @@
 
 				html += '<table border="1" cellpadding="5" style="background-color: #FFF; width:100%">';
 				html += '<tr style="background-color: #FFC7C9"><th>Round key</th><th>Expansion formula</th><th>Final output</th></tr>'
-				for (let i = 0; i < key.length; i += 4) {
+				for(let i = 0; i < key.length; i += 4) {
 					let s1 = '00' + key[i].toString(16).toUpperCase();
 					s1 = s1.substring(s1.length - 2);
 					let s2 = '00' + key[i + 1].toString(16).toUpperCase();
@@ -420,7 +468,6 @@
 
 					let s = (pre[i / 4] + ' ' + s1 + ' ' + s2 + ' ' + s3 + ' ' + s4).split(' = ');
 
-
 					html += '<tr' + (Math.floor(i / 16) % 2 == 1 ? ' style="background-color: #FEE6EA"' : '') + '><td>' + s[0] + '</td><td>' + s[1] + '</td><td><b>' + s[2] + '</b></td></tr>';
 				}
 				html += '</table>'
@@ -429,7 +476,7 @@
 
 			let count = 0, i;
 			addRoundKey(block, key.slice(0, 16), 0, count);
-			for (i = 16; i < key.length - 16; i += 16) {
+			for(i = 16; i < key.length - 16; i += 16) {
 				count++;
 
 				subBytes(block, Sbox, count);
@@ -446,7 +493,7 @@
 			if(step++ == numSteps) return html;
 			html += '<br><h3><span class="step">Step ' + step + ':</span> Output the ciphertext</h3>';
 
-			html += 'FINAL RESULT:\n'+toHexString(block);
+			html += 'The ciphertext is the final block state:\n'+toHexString(block).match(/(.{4}?)/g).join(' ');
 
 			ciphertext = toHexString(block);
 
