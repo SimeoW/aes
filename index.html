@@ -133,6 +133,7 @@
 		}
 
 
+
 		computeAES();
 
 		function computeAES() {
@@ -534,7 +535,7 @@
 			if(lastBlockAfterEachRound.length > 0) {
 				/* Step 43 */
 				if(step++ == numSteps) return html;
-				html += '<br><h3><span class="step">Step ' + step + ':</span> Compare with last round</h3>';
+				html += '<br><h3><span class="step">Step ' + step + ':</span> Compare with last message</h3>';
 
 				round = -2;
 				for(let i in blockAfterEachRound) {
