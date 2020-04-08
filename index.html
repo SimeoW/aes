@@ -103,6 +103,7 @@
 	<script>
 		let useBlockTranspose = document.getElementById('transpose').checked;
 		let updateAEStimer = null;
+		let lastBlockAfterEachRound = [];
 		function getCaretPosition(ctrl) {
 			if(ctrl.type != 'text') return;
 			var CaretPos = 0; // IE Support
@@ -193,8 +194,18 @@
 				137, 13, 191, 230, 66, 104, 65, 153, 45, 15, 176, 84, 187, 22
 			];
 			const shiftRowTab = [0, 5, 10, 15, 4, 9, 14, 3, 8, 13, 2, 7, 12, 1, 6, 11];
+			
+			let blockAfterEachRound = [];
 
-			const byteToString = (byte) => ('00' + byte.toString(16)).slice(-2).toUpperCase();
+			const byteToString = (byte, base = 16) => {
+				if(base == 2) {
+					return ('00000000' + byte.toString(2)).slice(-8);
+				} else if(base == 16) {
+					return ('00' + byte.toString(16)).slice(-2).toUpperCase();
+				} else {
+					return byte.toString(base).toUpperCase();
+				}
+			}
 
 			const subBytes = (block, sbox, count) => {
 				/* Step */
@@ -474,8 +485,11 @@
 			}
 			expandKey(key);
 
+			blockAfterEachRound.push(block.slice());
 			let count = 0, i;
 			addRoundKey(block, key.slice(0, 16), 0, count);
+
+			blockAfterEachRound.push(block.slice());
 			for(i = 16; i < key.length - 16; i += 16) {
 				count++;
 
@@ -483,17 +497,70 @@
 				shiftRows(block, shiftRowTab, count);
 				mixColumns(block, count);
 				addRoundKey(block, key.slice(i, i + 16), i / 4, count);
+				blockAfterEachRound.push(block.slice());
 			}
+			count++;
 			subBytes(block, Sbox, count);
 			shiftRows(block, shiftRowTab, count);
 			addRoundKey(block, key.slice(i, key.length), i / 4, count);
+			blockAfterEachRound.push(block.slice());
 
 
 			/* Step 42 */
 			if(step++ == numSteps) return html;
 			html += '<br><h3><span class="step">Step ' + step + ':</span> Output the ciphertext</h3>';
 
-			html += 'The ciphertext is the final block state:\n'+toHexString(block).match(/(.{4}?)/g).join(' ');
+			html += 'In conclusion, the block states after each round are as follows:<br><hr>';
+			round = -2;
+			for(let block of blockAfterEachRound) {
+				round++;
+				if(round >= 0 ) html += `Round ${round}: `;
+				else html += 'Initialize: ';
+				html += `${block.map(x => byteToString(x)).join(' ')}<br>`;
+			}
+
+			/* Shows the binary representation as well
+			html += '<br>Or in binary:<hr>';
+			round = -2;
+			for(let block of blockAfterEachRound) {
+				round++;
+				if(round >= 0 ) html += `Round ${round}: `;
+				else html += 'Initialize: ';
+				html += `${block.map(x => byteToString(x, 2)).join(' ')}<br>`;
+			}
+			*/
+
+			html += '<br><hr>The ciphertext is the final block state:\n'+toHexString(block).match(/(.{4}?)/g).join(' ');
+
+			if(lastBlockAfterEachRound.length > 0) {
+				/* Step 43 */
+				if(step++ == numSteps) return html;
+				html += '<br><h3><span class="step">Step ' + step + ':</span> Compare with last round</h3>';
+
+				round = -2;
+				for(let i in blockAfterEachRound) {
+					round++;
+					thisBlock = blockAfterEachRound[i];
+					lastBlock = lastBlockAfterEachRound[i];
+
+					let bitDifference = 0;
+					let thisBlockBinary = thisBlock.map(x => byteToString(x, 2)).join('')
+					let lastBlockBinary = lastBlock.map(x => byteToString(x, 2)).join('')
+					for(let j = 0; j < thisBlockBinary.length; j++) {
+						if(thisBlockBinary[j] != lastBlockBinary[j]) {
+							bitDifference++;
+						}
+					}
+
+					if(round >= 0 ) html += `<br><br>Round ${round}: `;
+					else html += 'Initialize: ';
+
+					html += '<br>Last block: ' + lastBlock.map(x => byteToString(x)).join(' ');
+					html += '<br>This block: ' + thisBlock.map(x => byteToString(x)).join(' ');
+					html += '<br>Number of bits flipped: ' + bitDifference;
+				}
+			}
+			lastBlockAfterEachRound = blockAfterEachRound.slice();
 
 			ciphertext = toHexString(block);
 
