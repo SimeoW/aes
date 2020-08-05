@@ -10,7 +10,7 @@ Simply type a hexadecimal value into one of the input boxes, and the output will
 ![](/screenshot.png)
 
 This application is published to
-https://simewu.github.io/des/
+https://simewu.github.io/aes
 
 or
 
